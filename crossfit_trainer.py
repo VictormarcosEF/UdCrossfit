@@ -1,5 +1,6 @@
 import base64
 import io
+import re
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -27,7 +28,10 @@ from reportlab.platypus import (
     Table,
     TableStyle,
     KeepInFrame,
+    KeepTogether,
 )
+from reportlab.graphics.barcode import qr
+from reportlab.graphics.shapes import Drawing
 
 # Configuración de la página
 st.set_page_config(
@@ -38,6 +42,7 @@ st.set_page_config(
 
 BASE_DIR = Path(__file__).parent
 ICONO_PROFESOR = BASE_DIR / "iconoentrena.jpg"
+ENCABEZADO_IMG = BASE_DIR / "encabezado.jpeg"
 EMOJI_FONT_PATH = Path("C:/Windows/Fonts/seguiemj.ttf")
 EMOJI_FONT_REGULAR_NAME = "SegoeUIEmoji"
 EMOJI_FONT_BOLD_NAME = "SegoeUIEmoji-Bold"
@@ -227,12 +232,163 @@ def generar_icono_decorativo(tipo: str):
         draw.line((center, size * 0.38, center, size * 0.62), fill=hand, width=16)
         draw.line((center, size * 0.38, size * 0.65, size * 0.3), fill=hand, width=16)
 
+    def draw_movement():
+        bg_color = (236, 253, 245, 255)
+        accent = (16, 185, 129, 255)
+        secondary = (5, 150, 105, 255)
+        draw.ellipse((0, 0, size, size), fill=bg_color)
+        draw.arc((size * 0.2, size * 0.2, size * 0.9, size * 0.9), 200, 320, fill=accent, width=18)
+        draw.ellipse((size * 0.52, size * 0.18, size * 0.7, size * 0.36), fill=secondary)
+        draw.line((size * 0.6, size * 0.34, size * 0.48, size * 0.55), fill=secondary, width=30)
+        draw.line((size * 0.48, size * 0.55, size * 0.66, size * 0.72), fill=accent, width=28)
+        draw.line((size * 0.52, size * 0.45, size * 0.66, size * 0.52), fill=accent, width=26)
+        draw.line((size * 0.52, size * 0.45, size * 0.4, size * 0.3), fill=accent, width=20)
+
+    def draw_performance():
+        base = (255, 251, 235, 255)
+        ribbon = (249, 115, 22, 255)
+        medal = (247, 224, 138, 255)
+        star = (251, 191, 36, 255)
+        draw.ellipse((0, 0, size, size), fill=base)
+        draw.polygon(
+            [
+                (size * 0.4, size * 0.05),
+                (size * 0.5, size * 0.28),
+                (size * 0.6, size * 0.05),
+                (size * 0.74, size * 0.05),
+                (size * 0.55, size * 0.45),
+                (size * 0.45, size * 0.45),
+                (size * 0.26, size * 0.05),
+            ],
+            fill=ribbon,
+        )
+        draw.ellipse((size * 0.25, size * 0.32, size * 0.75, size * 0.82), fill=medal, outline=ribbon, width=12)
+        draw.polygon(
+            [
+                (center, size * 0.38),
+                (size * 0.43, size * 0.58),
+                (size * 0.28, size * 0.6),
+                (size * 0.4, size * 0.72),
+                (size * 0.36, size * 0.88),
+                (center, size * 0.8),
+                (size * 0.64, size * 0.88),
+                (size * 0.6, size * 0.72),
+                (size * 0.72, size * 0.6),
+                (size * 0.57, size * 0.58),
+            ],
+            fill=star,
+        )
+
+    def draw_wellbeing():
+        base = (237, 233, 254, 255)
+        heart = (244, 114, 182, 255)
+        brain = (99, 102, 241, 255)
+        draw.ellipse((0, 0, size, size), fill=base)
+        draw.ellipse((size * 0.22, size * 0.3, size * 0.48, size * 0.62), fill=brain)
+        draw.ellipse((size * 0.38, size * 0.32, size * 0.64, size * 0.64), fill=brain)
+        draw.rectangle((size * 0.38, size * 0.45, size * 0.64, size * 0.65), fill=brain)
+        draw.arc((size * 0.2, size * 0.5, size * 0.8, size * 0.9), 200, 340, fill=(165, 180, 252, 255), width=18)
+        heart_points = [
+            (size * 0.5, size * 0.8),
+            (size * 0.32, size * 0.62),
+            (size * 0.32, size * 0.48),
+            (size * 0.42, size * 0.4),
+            (size * 0.5, size * 0.48),
+            (size * 0.58, size * 0.4),
+            (size * 0.68, size * 0.48),
+            (size * 0.68, size * 0.62),
+        ]
+        draw.polygon(heart_points, fill=heart)
+
+    def draw_dumbbell():
+        bg = (249, 250, 255, 255)
+        plate = (31, 41, 55, 255)
+        plate_inner = (75, 85, 99, 255)
+        handle = (209, 213, 219, 255)
+        grip = (156, 163, 175, 255)
+        accent = (249, 115, 22, 255)
+        draw.ellipse((0, 0, size, size), fill=bg)
+        # left plates
+        rounded_rect((size * 0.12, size * 0.3, size * 0.24, size * 0.7), radius=60, fill=plate)
+        rounded_rect((size * 0.16, size * 0.34, size * 0.28, size * 0.66), radius=50, fill=plate_inner)
+        rounded_rect((size * 0.2, size * 0.38, size * 0.3, size * 0.62), radius=40, fill=accent)
+        # right plates
+        rounded_rect((size * 0.76, size * 0.3, size * 0.88, size * 0.7), radius=60, fill=plate)
+        rounded_rect((size * 0.72, size * 0.34, size * 0.84, size * 0.66), radius=50, fill=plate_inner)
+        rounded_rect((size * 0.7, size * 0.38, size * 0.8, size * 0.62), radius=40, fill=accent)
+        # handle
+        draw.rectangle((size * 0.28, size * 0.45, size * 0.72, size * 0.55), fill=handle)
+        draw.rectangle((size * 0.33, size * 0.45, size * 0.67, size * 0.55), fill=grip)
+        for idx in range(5):
+            x = size * (0.34 + idx * 0.07)
+            draw.line((x, size * 0.45, x, size * 0.55), fill=handle, width=6)
+
+    def draw_lifter():
+        bg = (255, 247, 237, 255)
+        body = (251, 146, 60, 255)
+        bar = (31, 41, 55, 255)
+        plates = (59, 130, 246, 255)
+        draw.ellipse((0, 0, size, size), fill=bg)
+        draw.line((size * 0.2, size * 0.28, size * 0.8, size * 0.28), fill=bar, width=24)
+        draw.rectangle((size * 0.18, size * 0.16, size * 0.24, size * 0.4), fill=plates)
+        draw.rectangle((size * 0.76, size * 0.16, size * 0.82, size * 0.4), fill=plates)
+        draw.ellipse((center - size * 0.08, size * 0.32, center + size * 0.08, size * 0.48), fill=body)
+        draw.line((center, size * 0.48, size * 0.74, size * 0.68), fill=body, width=26)
+        draw.line((center, size * 0.48, size * 0.26, size * 0.68), fill=body, width=26)
+        draw.line((size * 0.62, size * 0.84, size * 0.5, size * 0.62), fill=body, width=24)
+        draw.line((size * 0.38, size * 0.84, size * 0.5, size * 0.62), fill=body, width=24)
+        draw.ellipse((center - size * 0.07, size * 0.18, center + size * 0.07, size * 0.32), fill=(254, 215, 170, 255))
+        draw.arc((center - size * 0.05, size * 0.24, center + size * 0.05, size * 0.34), 200, -20, fill=bar, width=6)
+
+    def draw_summit():
+        sky = (224, 242, 255, 255)
+        mountain = (71, 85, 105, 255)
+        snow = (226, 232, 240, 255)
+        flagpole = (30, 41, 59, 255)
+        flag = (250, 82, 82, 255)
+        sun = (252, 211, 77, 255)
+        draw.ellipse((0, 0, size, size), fill=sky)
+        draw.ellipse((size * 0.68, size * 0.08, size * 0.9, size * 0.3), fill=sun)
+        draw.polygon(
+            [
+                (size * 0.15, size * 0.9),
+                (size * 0.38, size * 0.52),
+                (size * 0.52, size * 0.66),
+                (size * 0.68, size * 0.4),
+                (size * 0.88, size * 0.9),
+            ],
+            fill=mountain,
+        )
+        draw.polygon(
+            [
+                (size * 0.56, size * 0.45),
+                (size * 0.64, size * 0.32),
+                (size * 0.72, size * 0.52),
+            ],
+            fill=snow,
+        )
+        draw.rectangle((size * 0.64, size * 0.25, size * 0.66, size * 0.58), fill=flagpole)
+        draw.polygon(
+            [
+                (size * 0.66, size * 0.26),
+                (size * 0.82, size * 0.32),
+                (size * 0.66, size * 0.38),
+            ],
+            fill=flag,
+        )
+
     draw_funcs = {
         "target": draw_target,
         "strength": draw_strength,
         "notes": draw_notes,
         "settings": draw_settings,
         "timer": draw_timer,
+        "movement": draw_movement,
+        "performance": draw_performance,
+        "wellbeing": draw_wellbeing,
+        "dumbbell": draw_dumbbell,
+        "lifter": draw_lifter,
+        "summit": draw_summit,
     }
 
     painter = draw_funcs.get(tipo)
@@ -278,6 +434,20 @@ if icono_data_uri:
     )
 else:
     st.markdown("### Profesor Víctor Manuel Marcos Muñoz")
+
+st.info(
+    """
+    El CrossFit combina movimientos funcionales ejecutados a alta intensidad en formato circuito para
+    desarrollar fuerza, resistencia y coordinación. Cada entrenamiento debe adaptarse a las características
+    personales y al material disponible, priorizando la seguridad en todo momento.
+
+    - Utiliza cargas moderadas que no comprometan la técnica ni supongan riesgo de lesión.
+    - Si el circuito requiere muchas repeticiones, opta por ejercicios de autocarga o con cargas bajas.
+    - Ajusta la selección de ejercicios y descansos según tu nivel y consulta con el profesor ante cualquier duda.
+    
+    ¡Recuerda que el objetivo es disfrutar del proceso y progresar de forma segura!
+    """
+)
 
 # Definición de ejercicios por categoría
 EJERCICIOS = {
@@ -360,6 +530,20 @@ EJERCICIOS = {
         "Over the Shoulder Toss",
         "Medicine Ball Burpee",
     ],
+    "Comba": [
+        "Unders",
+        "Under Crossover",
+        "Double Under",
+    ],
+    "Carrera": [
+        "Shuttle Run",
+        "Carrera 100 m",
+        "Carrera 200 m",
+        "Carrera 400 m",
+        "Carrera 600 m",
+        "Carrera 800 m",
+        "Carrera 1 km",
+    ],
 }
 # Información de tipos de circuito
 TIPOS_CIRCUITO = {
@@ -387,8 +571,143 @@ TIPOS_CIRCUITO = {
         "nombre": "AFAP (As Fast As Possible)",
         "descripcion": "Completa las repeticiones establecidas lo más rápido posible",
         "duracion_sugerida": "Variable"
+    },
+    "Circuito de Entrenamiento": {
+        "nombre": "Circuito de Entrenamiento",
+        "descripcion": "Secuencia de 6 a 12 ejercicios personalizados para objetivos de fuerza",
+        "duracion_sugerida": "Variable según objetivo"
     }
 }
+
+OBJETIVOS_ENTRENAMIENTO = {
+    "Fuerza Máxima": {
+        "descripcion": "Prioriza la producción de fuerza absoluta con pocas repeticiones y descansos amplios.",
+        "porcentaje": "85–100%",
+        "carga": "85–100% del 1RM",
+        "reps": "1–5",
+        "series": "3–6",
+        "descanso": "3–5 min",
+        "rir": "2–4",
+    },
+    "Hipertrofia": {
+        "descripcion": "Busca aumentar el tamaño muscular con un volumen moderado-alto y descansos controlados.",
+        "porcentaje": "65–85%",
+        "carga": "65–85% del 1RM",
+        "reps": "6–12 (hasta 15)",
+        "series": "3–5",
+        "descanso": "60–90 s",
+        "rir": "0–2",
+    },
+    "Fuerza-Resistencia": {
+        "descripcion": "Mejora la capacidad de sostener esfuerzos prolongados con cargas ligeras y muchas repeticiones.",
+        "porcentaje": "30–60%",
+        "carga": "30–60% del 1RM",
+        "reps": "15–30+",
+        "series": "2–4",
+        "descanso": "30–60 s",
+        "rir": "3–5",
+    },
+}
+
+OBJETIVOS_ORDEN = ["Fuerza Máxima", "Hipertrofia", "Fuerza-Resistencia"]
+MIN_EJERCICIOS_CIRCUITO = 6
+MAX_EJERCICIOS_CIRCUITO = 12
+CIRCUITO_ENTRENAMIENTO_KEY = "Circuito de Entrenamiento"
+EMOM_RECUPERACION_TEXTO = (
+    "Completa cada bloque en 40-45 s y usa el resto del minuto (15-20 s) para recuperar y preparar la siguiente serie."
+)
+
+BORG_ESCALA = [
+    {
+        "nivel": "Muy ligero",
+        "emoji": "😊",
+        "color": "#DCFCE7",
+        "descripcion": "Respiración tranquila; sirve como calentamiento o descarga.",
+    },
+    {
+        "nivel": "Ligero",
+        "emoji": "🙂",
+        "color": "#BBF7D0",
+        "descripcion": "Puedes mantener una conversación corta; sensación cómoda.",
+    },
+    {
+        "nivel": "Moderado",
+        "emoji": "😅",
+        "color": "#FDE68A",
+        "descripcion": "Empiezas a sudar; concentración total en la técnica.",
+    },
+    {
+        "nivel": "Duro",
+        "emoji": "😣",
+        "color": "#FECACA",
+        "descripcion": "Respiración intensa; requiere pausas planificadas.",
+    },
+    {
+        "nivel": "Muy duro",
+        "emoji": "🥵",
+        "color": "#FCA5A5",
+        "descripcion": "Esfuerzo máximo sostenible sólo durante poco tiempo.",
+    },
+]
+
+BENEFICIOS_WOD = {
+    "AMRAP": [
+        "Mejora la resistencia muscular al repetir rondas sostenidas.",
+        "Potencia la capacidad de gestión del ritmo y del tiempo de trabajo.",
+        "Favorece el uso de cargas moderadas con densidad alta de ejercicio.",
+    ],
+    "EMOM": [
+        "Entrena la velocidad de ejecución bajo fatiga controlada.",
+        "Refuerza la técnica mediante descansos breves y predecibles.",
+        "Optimiza la autogestión del esfuerzo gracias a intervalos fijos.",
+    ],
+    "Tabata": [
+        "Impulsa la potencia anaeróbica con intervalos explosivos.",
+        "Incrementa la tolerancia al lactato en trabajos muy intensos.",
+        "Favorece la quema calórica en tiempos reducidos.",
+    ],
+    "Ladder": [
+        "Desarrolla fuerza progresiva gracias al aumento o disminución de repeticiones.",
+        "Promueve el control de la técnica bajo volúmenes cambiantes.",
+        "Estimula la concentración al gestionar saltos de carga o repeticiones.",
+    ],
+    "AFAP": [
+        "Mejora la potencia y la velocidad de finalización de tareas.",
+        "Incrementa la capacidad de mantener intensidad alta sin pausas largas.",
+        "Entrena la toma de decisiones rápida bajo presión.",
+    ],
+    CIRCUITO_ENTRENAMIENTO_KEY: [
+        "Permite atacar objetivos concretos de fuerza, hipertrofia o resistencia.",
+        "Desarrolla equilibrio muscular combinando implementos y autocargas.",
+        "Favorece la transferencia a gestos deportivos y de la vida diaria.",
+    ],
+}
+
+BENEFICIOS_OTROS = [
+    "Reduce el estrés y mejora el estado de ánimo a través de la liberación de endorfinas.",
+    "Potencia la función cognitiva, la memoria de trabajo y la capacidad de concentración.",
+    "Refuerza la autoconfianza y la percepción de autoeficacia en el entrenamiento diario.",
+    "Mejora la calidad del sueño y acelera la recuperación mental.",
+    "Favorece la socialización y el sentido de comunidad con el grupo de entrenamiento.",
+    "Ayuda a regular la ansiedad y promueve hábitos saludables sostenibles.",
+]
+
+
+def extraer_rango_numerico(texto: Optional[str], fallback_min: int = 1, fallback_max: int = 10):
+    """Obtiene el rango numérico (mínimo, máximo) presente en un texto como "6–12"."""
+    if fallback_min > fallback_max:
+        fallback_max = fallback_min
+    numeros = [int(valor) for valor in re.findall(r"\d+", texto or "")]
+    if not numeros:
+        return fallback_min, fallback_max
+    return min(numeros), max(numeros)
+
+
+def valor_intermedio(min_val: int, max_val: int) -> int:
+    """Devuelve un valor entero centrado dentro del rango dado."""
+    if min_val >= max_val:
+        return min_val
+    return min_val + (max_val - min_val) // 2
 
 EJERCICIOS_INFO = {
     "Flexiones (Push-ups)": ["Pectoral", "Tríceps", "Core"],
@@ -455,6 +774,16 @@ EJERCICIOS_INFO = {
     "Medicine Ball Sit-up": ["Abdomen", "Oblicuos"],
     "Over the Shoulder Toss": ["Espalda", "Glúteos", "Core"],
     "Medicine Ball Burpee": ["Cardio", "Hombros", "Piernas"],
+    "Unders": ["Cardio", "Pantorrillas", "Hombros"],
+    "Under Crossover": ["Cardio", "Pantorrillas", "Hombros"],
+    "Double Under": ["Cardio", "Pantorrillas", "Hombros"],
+    "Shuttle Run": ["Cardio", "Cuádriceps", "Isquiotibiales"],
+    "Carrera 100 m": ["Cardio", "Cuádriceps", "Pantorrillas"],
+    "Carrera 200 m": ["Cardio", "Cuádriceps", "Pantorrillas"],
+    "Carrera 400 m": ["Cardio", "Cuádriceps", "Pantorrillas"],
+    "Carrera 600 m": ["Cardio", "Cuádriceps", "Pantorrillas"],
+    "Carrera 800 m": ["Cardio", "Cuádriceps", "Pantorrillas"],
+    "Carrera 1 km": ["Cardio", "Cuádriceps", "Pantorrillas"],
 }
 def obtener_musculos(ejercicio: str):
     return EJERCICIOS_INFO.get(ejercicio, ["Cuerpo completo"])
@@ -486,16 +815,16 @@ with st.sidebar:
     st.markdown("### 📖 Instrucciones")
     st.markdown("""
     1. Completa tu información
-    2. Selecciona el tipo de circuito
+    2. Selecciona el WOD
     3. Elige tus ejercicios favoritos
     4. Ajusta parámetros
     5. ¡Descarga tu entrenamiento!
     """)
 
 # Sección principal - Selección de tipo de circuito
-st.markdown('<p class="sub-header">Tipo de Circuito</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-header">WOD</p>', unsafe_allow_html=True)
 tipo_circuito = st.selectbox(
-    "Selecciona el tipo de circuito:",
+    "Selecciona el WOD:",
     options=list(TIPOS_CIRCUITO.keys()),
     format_func=lambda x: TIPOS_CIRCUITO[x]["nombre"]
 )
@@ -507,8 +836,38 @@ with col1:
 with col2:
     st.info(f"**Duración sugerida:** {TIPOS_CIRCUITO[tipo_circuito]['duracion_sugerida']}")
 
-# Parámetros del circuito
-st.markdown('<p class="sub-header">Parámetros del Circuito</p>', unsafe_allow_html=True)
+es_circuito_entrenamiento = tipo_circuito == CIRCUITO_ENTRENAMIENTO_KEY
+objetivo = None
+objetivo_info = {}
+series_min = series_max = None
+reps_min = reps_max = None
+if es_circuito_entrenamiento:
+    st.markdown('<p class="sub-header">Objetivo del Entrenamiento</p>', unsafe_allow_html=True)
+    objetivo = st.radio(
+        "Selecciona el objetivo principal:",
+        options=OBJETIVOS_ORDEN,
+        index=1,
+        horizontal=True,
+    )
+    objetivo_info = OBJETIVOS_ENTRENAMIENTO.get(objetivo, {})
+    st.caption(objetivo_info.get("descripcion", ""))
+    if objetivo_info:
+        series_min, series_max = extraer_rango_numerico(objetivo_info.get("series"), 3, 6)
+        reps_min, reps_max = extraer_rango_numerico(objetivo_info.get("reps"), 8, 15)
+        st.markdown("**Parámetros del objetivo:**")
+        parametros_objetivo = [
+            ("Carga", objetivo_info.get("carga", "-")),
+            ("Reps", objetivo_info.get("reps", "-")),
+            ("Series", objetivo_info.get("series", "-")),
+            ("Descanso", objetivo_info.get("descanso", "-")),
+            ("RIR", objetivo_info.get("rir", "-")),
+        ]
+        cols_param = st.columns(len(parametros_objetivo))
+        for col, (label, value) in zip(cols_param, parametros_objetivo):
+            col.markdown(f"<small>{label}</small><br/><strong>{value}</strong>", unsafe_allow_html=True)
+
+# Parámetros del WOD
+st.markdown('<p class="sub-header">Parámetros del WOD</p>', unsafe_allow_html=True)
 
 duracion = None
 numero_rondas = None
@@ -529,7 +888,17 @@ with param_col1:
             index=2,
         )
     else:
-        numero_rondas = st.number_input("Número de rondas:", min_value=1, max_value=10, value=3)
+        if es_circuito_entrenamiento and series_min is not None and series_max is not None:
+            valor_series = valor_intermedio(series_min, series_max)
+            numero_rondas = st.number_input(
+                "Número de rondas:",
+                min_value=series_min,
+                max_value=series_max,
+                value=valor_series,
+            )
+            st.caption(f"Rango objetivo: {series_min}-{series_max} series")
+        else:
+            numero_rondas = st.number_input("Número de rondas:", min_value=1, max_value=10, value=3)
 
 with param_col2:
     if tipo_circuito == "Ladder":
@@ -547,6 +916,7 @@ ejercicios_seleccionados = []
 ejercicios_para_descarga = []
 plan_tabata = None
 tabata_listo = True
+ejercicios_validos = True
 
 # Crear tabs para cada categoría
 tabs = st.tabs(list(EJERCICIOS.keys()))
@@ -563,15 +933,45 @@ for idx, (categoria, ejercicios) in enumerate(EJERCICIOS.items()):
                 if seleccionado:
                     repeticiones = None
                     if tipo_circuito not in ["Tabata", "Ladder"]:
-                        default_reps = 10
-                        repeticiones = st.number_input(
-                            f"Repeticiones para {ejercicio}",
-                            min_value=1,
-                            max_value=500,
-                            value=default_reps,
-                            step=1,
-                            key=f"reps_{categoria}_{ejercicio}",
-                        )
+                        if ejercicio == "Shuttle Run":
+                            opciones_base = [4, 6, 10, 12, 14, 16, 20]
+                            opciones = opciones_base
+                            indice_default = min(2, len(opciones) - 1)
+                            if es_circuito_entrenamiento and reps_min is not None and reps_max is not None:
+                                opciones_filtradas = [opt for opt in opciones_base if reps_min <= opt <= reps_max]
+                                if not opciones_filtradas:
+                                    opciones_filtradas = sorted({reps_min, reps_max})
+                                opciones = sorted(opciones_filtradas)
+                                objetivo_reps = valor_intermedio(reps_min, reps_max)
+                                valor_default = min(opciones, key=lambda val: abs(val - objetivo_reps))
+                                indice_default = opciones.index(valor_default)
+                            repeticiones = st.selectbox(
+                                f"Repeticiones para {ejercicio}",
+                                options=opciones,
+                                index=indice_default,
+                                key=f"reps_{categoria}_{ejercicio}",
+                            )
+                        else:
+                            if es_circuito_entrenamiento and reps_min is not None and reps_max is not None:
+                                default_reps = valor_intermedio(reps_min, reps_max)
+                                repeticiones = st.number_input(
+                                    f"Repeticiones para {ejercicio}",
+                                    min_value=reps_min,
+                                    max_value=reps_max,
+                                    value=default_reps,
+                                    step=1,
+                                    key=f"reps_{categoria}_{ejercicio}",
+                                )
+                            else:
+                                default_reps = 10
+                                repeticiones = st.number_input(
+                                    f"Repeticiones para {ejercicio}",
+                                    min_value=1,
+                                    max_value=500,
+                                    value=default_reps,
+                                    step=1,
+                                    key=f"reps_{categoria}_{ejercicio}",
+                                )
                     ejercicios_seleccionados.append({
                         "categoria": categoria,
                         "nombre": ejercicio,
@@ -595,7 +995,19 @@ if ejercicios_seleccionados:
         else:
             plan_tabata = construir_tabata_plan(ejercicios_para_descarga)
 
-    if tabata_listo:
+    if es_circuito_entrenamiento:
+        if len(ejercicios_para_descarga) < MIN_EJERCICIOS_CIRCUITO:
+            st.warning(
+                f"Selecciona al menos {MIN_EJERCICIOS_CIRCUITO} ejercicios para tu circuito de entrenamiento."
+            )
+            ejercicios_validos = False
+        elif len(ejercicios_para_descarga) > MAX_EJERCICIOS_CIRCUITO:
+            st.warning(
+                f"Reduce la lista a un máximo de {MAX_EJERCICIOS_CIRCUITO} ejercicios para mantener la calidad del circuito."
+            )
+            ejercicios_validos = False
+
+    if tabata_listo and ejercicios_validos:
         st.success(f"Se utilizarán {len(ejercicios_para_descarga)} ejercicio(s) en tu entrenamiento")
     
     col1, col2 = st.columns([2, 1])
@@ -611,13 +1023,25 @@ if ejercicios_seleccionados:
     with col2:
         st.markdown("**Configuración:**")
         st.markdown(f"- Tipo: {TIPOS_CIRCUITO[tipo_circuito]['nombre']}")
+        if objetivo:
+            st.markdown(f"- Objetivo: {objetivo}")
         if tipo_circuito in ["AMRAP", "EMOM"]:
             st.markdown(f"- Duración: {duracion} min")
+            if tipo_circuito == "EMOM":
+                st.markdown(f"- Recuperación: {EMOM_RECUPERACION_TEXTO}")
         elif tipo_circuito == "Tabata":
             st.markdown(f"- Ejercicios diferentes: {numero_ejercicios_tabata}")
             st.markdown("- Bloques: 8 (20\" trabajo / 10\" descanso)")
         else:
             st.markdown(f"- Rondas: {numero_rondas}")
+
+        if objetivo and objetivo_info:
+            st.markdown("**Parámetros del objetivo:**")
+            st.caption(
+                f"Carga: {objetivo_info['carga']} | Reps: {objetivo_info['reps']} | "
+                f"Series: {objetivo_info['series']} | Descanso: {objetivo_info['descanso']} | "
+                f"RIR: {objetivo_info['rir']}"
+            )
 
         if tipo_circuito == "Ladder" and incremento is not None and reps_inicio is not None:
             st.markdown(f"- Repeticiones iniciales: {reps_inicio}")
@@ -632,7 +1056,7 @@ else:
     st.warning("No has seleccionado ningún ejercicio. Por favor, selecciona al menos uno.")
 
 # Función para generar PDF
-def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabata=None):
+def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabata=None, objetivo=None, objetivo_info=None):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -645,6 +1069,7 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
     story = []
     styles = getSampleStyleSheet()
     font_regular, font_bold = obtener_fuentes_para_pdf()
+    objetivo_info = objetivo_info or OBJETIVOS_ENTRENAMIENTO.get(objetivo)
 
     title_style = ParagraphStyle(
         'CustomTitle',
@@ -695,7 +1120,7 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
     def wrap_flow(flowable, width, height):
         return KeepInFrame(width, height, [flowable], mode='shrink')
 
-    def agregar_seccion(titulo: str, icono_tipo: Optional[str] = None, color_fondo: str = '#2F3C7E'):
+    def construir_encabezado(titulo: str, icono_tipo: Optional[str], color_fondo: str):
         icon_flow = construir_icono(icono_tipo, 0.42*inch) if icono_tipo else None
         if icon_flow:
             data = [[icon_flow, Paragraph(titulo.upper(), section_header_style)]]
@@ -703,7 +1128,6 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
         else:
             data = [[Paragraph(titulo.upper(), section_header_style)]]
             col_widths = [doc.width]
-
         header = Table(data, colWidths=col_widths)
         header.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(color_fondo)),
@@ -713,11 +1137,57 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
             ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]))
-        story.append(header)
-        story.append(Spacer(1, 0.08*inch))
+        return header
 
-    story.append(Paragraph("💪Entrenamiento CrossFit💪", title_style))
-    story.append(Spacer(1, 0.05*inch))
+    def agregar_bloque(titulo: str, contenido, icono_tipo: Optional[str] = None, color_fondo: str = '#2F3C7E'):
+        contenido_list = contenido if isinstance(contenido, list) else [contenido]
+        elementos = [construir_encabezado(titulo, icono_tipo, color_fondo), Spacer(1, 0.08*inch)]
+        elementos.extend(contenido_list)
+        story.append(KeepTogether(elementos))
+        story.append(Spacer(1, 0.12*inch))
+
+    def construir_lista_puntos(textos):
+        data = [[Paragraph("•", cell_bold), Paragraph(texto, cell_style)] for texto in textos]
+        tabla = Table(data, colWidths=[0.18*inch, doc.width - 0.18*inch])
+        tabla.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1F2933')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        return tabla
+
+    def construir_tabla_borg():
+        data = [[Paragraph("Sensación", cell_bold), Paragraph("Descripción", cell_bold)]]
+        for nivel in BORG_ESCALA:
+            data.append([
+                Paragraph(f"{nivel['emoji']} {nivel['nivel']}", cell_style),
+                Paragraph(nivel['descripcion'], cell_style)
+            ])
+        tabla = Table(data, colWidths=[0.34*doc.width, 0.66*doc.width])
+        estilo = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E0E7FF')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1E1B4B')),
+            ('FONTNAME', (0, 0), (-1, 0), font_bold),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#E5E7EB')),
+        ]
+        for idx, nivel in enumerate(BORG_ESCALA, start=1):
+            estilo.append(('BACKGROUND', (0, idx), (-1, idx), colors.HexColor(nivel['color'])))
+        tabla.setStyle(TableStyle(estilo))
+        return tabla
+
+    encabezado_img = None
+    if ENCABEZADO_IMG.exists():
+        encabezado_img = RLImage(str(ENCABEZADO_IMG), width=doc.width, height=doc.width * 0.28)
+    if encabezado_img:
+        encabezado_img.hAlign = 'CENTER'
+        story.append(KeepTogether([encabezado_img]))
+        story.append(Spacer(1, 0.05*inch))
+    else:
+        story.append(Paragraph("Entrenamiento CrossFit", title_style))
+        story.append(Spacer(1, 0.05*inch))
 
     icono_pdf_bytes = obtener_icono_profesor_pdf_bytes()
     icon_img = None
@@ -764,7 +1234,7 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
         ('INNERGRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#E0E4EC')),
         ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#E0E4EC')),
     ]))
-    story.append(info_table)
+    story.append(KeepTogether([info_table]))
     story.append(Spacer(1, 0.1*inch))
 
     target_icon_flow = construir_icono('target', 1.0*inch)
@@ -773,7 +1243,7 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
     else:
         tipo_icon = Spacer(1.0*inch, 1.0*inch)
     texto_tipo = (
-        "<font size=9 color='#B5179E'>TIPO DE CIRCUITO</font><br/>"
+        "<font size=9 color='#B5179E'>WOD</font><br/>"
         f"<font size=18 color='#B5179E'><b>{TIPOS_CIRCUITO[tipo_circuito]['nombre']}</b></font><br/>"
         f"<font size=11 color='#1F2933'>{TIPOS_CIRCUITO[tipo_circuito]['descripcion']}</font>"
     )
@@ -793,17 +1263,21 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
-    story.append(tipo_card)
+    story.append(KeepTogether([tipo_card]))
     story.append(Spacer(1, 0.16*inch))
 
+    notas = [
+        "Realiza un calentamiento de 5-10 minutos antes de comenzar",
+        "Mantén una técnica correcta en todo momento",
+        "Hidrátate adecuadamente durante el entrenamiento",
+        "Escucha a tu cuerpo y ajusta la intensidad si es necesario",
+        "Realiza estiramientos al finalizar (5-10 minutos)",
+    ]
+    notas_table = construir_lista_puntos(notas)
+    agregar_bloque("Notas importantes", [notas_table], icono_tipo="notes", color_fondo='#92400E')
+
     if parametros:
-        agregar_seccion("Parámetros configurados", icono_tipo="settings", color_fondo='#1F4172')
-        param_rows = []
-        for key, value in parametros.items():
-            param_rows.append([
-                Paragraph(key, cell_bold),
-                Paragraph(str(value), cell_style)
-            ])
+        param_rows = [[Paragraph(key, cell_bold), Paragraph(str(value), cell_style)] for key, value in parametros.items()]
         param_table = Table(param_rows, colWidths=[0.38*doc.width, 0.62*doc.width])
         param_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), colors.whitesmoke),
@@ -814,11 +1288,57 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#D9DEE7')),
         ]))
-        story.append(param_table)
-        story.append(Spacer(1, 0.12*inch))
+        agregar_bloque("Parámetros configurados", [param_table], icono_tipo="settings", color_fondo='#1F4172')
+
+    if objetivo and objetivo_info:
+        objetivo_rows = []
+        for etiqueta, campo in [
+            ("Objetivo", objetivo),
+            ("Carga", objetivo_info['carga']),
+            ("Repeticiones", objetivo_info['reps']),
+            ("Series", objetivo_info['series']),
+            ("Descanso", objetivo_info['descanso']),
+            ("RIR", objetivo_info['rir']),
+        ]:
+            objetivo_rows.append([Paragraph(etiqueta, cell_bold), Paragraph(campo, cell_style)])
+        objetivo_table = Table(objetivo_rows, colWidths=[0.34*doc.width, 0.66*doc.width])
+        objetivo_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FFF7ED')),
+            ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#FFF1DB')]),
+            ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#F4C7A1')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        agregar_bloque("Objetivo del entrenamiento", [objetivo_table], icono_tipo="summit", color_fondo='#B42318')
+
+    if objetivo:
+        tabla_resumen = [["Objetivo", "%1RM", "Reps", "Series", "Descanso", "RIR"]]
+        for nombre in OBJETIVOS_ORDEN:
+            datos = OBJETIVOS_ENTRENAMIENTO[nombre]
+            tabla_resumen.append([
+                Paragraph(nombre, cell_style),
+                Paragraph(datos['porcentaje'], cell_style),
+                Paragraph(datos['reps'], cell_style),
+                Paragraph(datos['series'], cell_style),
+                Paragraph(datos['descanso'], cell_style),
+                Paragraph(datos['rir'], cell_style),
+            ])
+        resumen_table = Table(
+            tabla_resumen,
+            colWidths=[0.22*doc.width, 0.14*doc.width, 0.14*doc.width, 0.14*doc.width, 0.2*doc.width, 0.16*doc.width]
+        )
+        resumen_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), font_bold),
+            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#CBD5F5')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#EEF2FF')])
+        ]))
+        agregar_bloque("Tabla guía de objetivos", [resumen_table], icono_tipo="settings", color_fondo='#0F172A')
 
     if plan_tabata:
-        agregar_seccion("Plan Tabata", icono_tipo="timer", color_fondo='#A02334')
         plan_data = [["Ejercicio", 'Bloques (20" trabajo / 10" descanso)']]
         for item in plan_tabata:
             plan_data.append([
@@ -835,10 +1355,25 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
             ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#F9DCDC')),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FFF2F2')])
         ]))
-        story.append(plan_table)
-        story.append(Spacer(1, 0.12*inch))
+        tabata_url = "https://youtu.be/V67eNoSYwNE"
+        enlace_parrafo = (
+            f"<font size=10>Escanea el código QR o usa este enlace: "
+            f"<link href='{tabata_url}' color='blue'>{tabata_url}</link></font>"
+        )
+        plan_content = [plan_table, Spacer(1, 0.08*inch), Paragraph(enlace_parrafo, cell_style), Spacer(1, 0.06*inch)]
+        try:
+            qr_widget = qr.QrCodeWidget(tabata_url)
+            bounds = qr_widget.getBounds()
+            width_qr = bounds[2] - bounds[0]
+            height_qr = bounds[3] - bounds[1]
+            size_qr = 1.6 * inch
+            drawing = Drawing(size_qr, size_qr, transform=[size_qr / width_qr, 0, 0, size_qr / height_qr, 0, 0])
+            drawing.add(qr_widget)
+            plan_content.append(drawing)
+        except Exception:
+            pass
+        agregar_bloque("Plan Tabata", plan_content, icono_tipo="timer", color_fondo='#A02334')
 
-    agregar_seccion("Ejercicios del circuito", icono_tipo="strength", color_fondo='#0F766E')
     ejercicios_data = [["#", "Ejercicio", "Categoría", "Grupos musculares", "Reps"]]
     for idx, ej in enumerate(ejercicios, 1):
         grupos = ", ".join(ej.get('musculos', obtener_musculos(ej['nombre'])))
@@ -873,39 +1408,73 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
         ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#B7E4DC')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F2FFFC')])
     ]))
-    story.append(ejercicios_table)
-    story.append(Spacer(1, 0.16*inch))
+    agregar_bloque("Ejercicios del WOD", [ejercicios_table], icono_tipo="dumbbell", color_fondo='#0F766E')
 
-    agregar_seccion("Notas importantes", icono_tipo="notes", color_fondo='#92400E')
-    notas = [
-        "Realiza un calentamiento de 5-10 minutos antes de comenzar",
-        "Mantén una técnica correcta en todo momento",
-        "Hidrátate adecuadamente durante el entrenamiento",
-        "Escucha a tu cuerpo y ajusta la intensidad si es necesario",
-        "Realiza estiramientos al finalizar (5-10 minutos)",
-    ]
-    notas_data = [[Paragraph("•", cell_bold), Paragraph(texto, cell_style)] for texto in notas]
-    notas_table = Table(notas_data, colWidths=[0.18*inch, doc.width - 0.18*inch])
-    notas_table.setStyle(TableStyle([
+    borg_table = construir_tabla_borg()
+    agregar_bloque(
+        "Percepción subjetiva del esfuerzo (Escala de Borg)",
+        [borg_table],
+        icono_tipo="notes",
+        color_fondo='#7C3AED'
+    )
+
+    beneficios_especificos = BENEFICIOS_WOD.get(
+        tipo_circuito,
+        BENEFICIOS_WOD.get(CIRCUITO_ENTRENAMIENTO_KEY, []),
+    )
+    if beneficios_especificos:
+        tabla_beneficios = construir_lista_puntos(beneficios_especificos)
+        agregar_bloque(
+            "Beneficios específicos del WOD",
+            [tabla_beneficios],
+            icono_tipo="performance",
+            color_fondo='#2563EB'
+        )
+
+    tabla_beneficios_generales = construir_lista_puntos(BENEFICIOS_OTROS)
+    agregar_bloque(
+        "Otros beneficios",
+        [tabla_beneficios_generales],
+        icono_tipo="wellbeing",
+        color_fondo='#4C1D95'
+    )
+
+    registro_table = Table(
+        [
+            [Paragraph("<b>Tiempo invertido / Rondas o repeticiones completadas</b>", cell_bold)],
+            [Paragraph("\n\n", cell_style)],
+            [Paragraph("<b>Observaciones</b>", cell_bold)],
+            [Paragraph("\n\n\n", cell_style)],
+        ],
+        colWidths=[doc.width],
+        rowHeights=[None, 0.4*inch, None, 0.55*inch]
+    )
+    registro_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5F5')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1F2933')),
-        ('LEFTPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
-    story.append(notas_table)
+    agregar_bloque("Registro del entrenamiento", [registro_table], icono_tipo="settings", color_fondo='#0F172A')
 
     doc.build(story)
     buffer.seek(0)
     return buffer
 
 # Botón de descarga
-if ejercicios_para_descarga and nombre and grupo and tabata_listo:
+if ejercicios_para_descarga and nombre and grupo and tabata_listo and ejercicios_validos:
     st.markdown("---")
     
     # Preparar parámetros para el PDF
     parametros = {}
+    if objetivo:
+        parametros["Objetivo"] = objetivo
     if tipo_circuito in ["AMRAP", "EMOM"]:
         parametros["Duración"] = f"{duracion} minutos"
+        if tipo_circuito == "EMOM":
+            parametros["Recuperación"] = EMOM_RECUPERACION_TEXTO
     elif tipo_circuito == "Tabata":
         parametros["Número de ejercicios"] = numero_ejercicios_tabata
         parametros["Bloques Tabata"] = "8 bloques (20\" trabajo + 10\" descanso)"
@@ -937,7 +1506,16 @@ if ejercicios_para_descarga and nombre and grupo and tabata_listo:
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        pdf_buffer = generar_pdf(nombre, grupo, tipo_circuito, ejercicios_para_descarga, parametros, plan_tabata)
+        pdf_buffer = generar_pdf(
+            nombre,
+            grupo,
+            tipo_circuito,
+            ejercicios_para_descarga,
+            parametros,
+            plan_tabata,
+            objetivo,
+            objetivo_info,
+        )
         
         st.download_button(
             label="Descargar Entrenamiento (PDF)",

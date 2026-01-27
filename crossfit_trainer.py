@@ -620,31 +620,31 @@ EMOM_RECUPERACION_TEXTO = (
 BORG_ESCALA = [
     {
         "nivel": "Muy ligero",
-        "emoji": "😊",
+        "icono": "borg_very_light",
         "color": "#DCFCE7",
         "descripcion": "Respiración tranquila; sirve como calentamiento o descarga.",
     },
     {
         "nivel": "Ligero",
-        "emoji": "🙂",
+        "icono": "borg_light",
         "color": "#BBF7D0",
         "descripcion": "Puedes mantener una conversación corta; sensación cómoda.",
     },
     {
         "nivel": "Moderado",
-        "emoji": "😅",
+        "icono": "borg_moderate",
         "color": "#FDE68A",
         "descripcion": "Empiezas a sudar; concentración total en la técnica.",
     },
     {
         "nivel": "Duro",
-        "emoji": "😣",
+        "icono": "borg_hard",
         "color": "#FECACA",
         "descripcion": "Respiración intensa; requiere pausas planificadas.",
     },
     {
         "nivel": "Muy duro",
-        "emoji": "🥵",
+        "icono": "borg_very_hard",
         "color": "#FCA5A5",
         "descripcion": "Esfuerzo máximo sostenible sólo durante poco tiempo.",
     },
@@ -1161,7 +1161,7 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
         data = [[Paragraph("Sensación", cell_bold), Paragraph("Descripción", cell_bold)]]
         for nivel in BORG_ESCALA:
             data.append([
-                Paragraph(f"{nivel['emoji']} {nivel['nivel']}", cell_style),
+                Paragraph(nivel['nivel'], cell_style),
                 Paragraph(nivel['descripcion'], cell_style)
             ])
         tabla = Table(data, colWidths=[0.34*doc.width, 0.66*doc.width])
@@ -1447,7 +1447,7 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
             [Paragraph("\n\n\n", cell_style)],
         ],
         colWidths=[doc.width],
-        rowHeights=[None, 0.4*inch, None, 0.55*inch]
+        rowHeights=[None, 0.4*inch, None, 1.1*inch]
     )
     registro_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),

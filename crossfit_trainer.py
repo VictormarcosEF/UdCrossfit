@@ -32,6 +32,8 @@ from reportlab.platypus import (
 )
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 
 # Configuración de la página
 st.set_page_config(
@@ -43,11 +45,14 @@ st.set_page_config(
 BASE_DIR = Path(__file__).parent
 ICONO_PROFESOR = BASE_DIR / "iconoentrena.jpg"
 ENCABEZADO_IMG = BASE_DIR / "encabezado.jpeg"
+CC_LOGO_PATH = BASE_DIR / "cc.png"
 EMOJI_FONT_PATH = Path("C:/Windows/Fonts/seguiemj.ttf")
 EMOJI_FONT_REGULAR_NAME = "SegoeUIEmoji"
 EMOJI_FONT_BOLD_NAME = "SegoeUIEmoji-Bold"
 DEFAULT_FONT_REGULAR = "Helvetica"
 DEFAULT_FONT_BOLD = "Helvetica-Bold"
+PROFESOR_NOMBRE = "Profesor Víctor Manuel Marcos Muñoz"
+PROFESOR_EMAIL = "victorm.marmun@educa.jcyl.es"
 
 
 @lru_cache(maxsize=1)
@@ -377,6 +382,20 @@ def generar_icono_decorativo(tipo: str):
             fill=flag,
         )
 
+    def draw_creative_commons():
+        bg = (244, 247, 252, 255)
+        ring = (31, 41, 55, 255)
+        text_color = (31, 41, 55, 255)
+        accent = (255, 255, 255, 255)
+        draw.ellipse((0, 0, size, size), fill=bg)
+        draw.ellipse((size * 0.08, size * 0.08, size * 0.92, size * 0.92), outline=ring, width=28)
+        draw.ellipse((size * 0.18, size * 0.18, size * 0.82, size * 0.82), fill=ring)
+        draw.ellipse((size * 0.23, size * 0.23, size * 0.77, size * 0.77), fill=accent)
+        draw.ellipse((size * 0.32, size * 0.36, size * 0.45, size * 0.64), outline=ring, width=14)
+        draw.ellipse((size * 0.55, size * 0.36, size * 0.68, size * 0.64), outline=ring, width=14)
+        draw.arc((size * 0.26, size * 0.36, size * 0.74, size * 0.78), 210, 330, fill=ring, width=16)
+        draw.text((size * 0.37, size * 0.18), "CC", fill=text_color)
+
     draw_funcs = {
         "target": draw_target,
         "strength": draw_strength,
@@ -389,6 +408,7 @@ def generar_icono_decorativo(tipo: str):
         "dumbbell": draw_dumbbell,
         "lifter": draw_lifter,
         "summit": draw_summit,
+        "creative_commons": draw_creative_commons,
     }
 
     painter = draw_funcs.get(tipo)
@@ -399,6 +419,16 @@ def generar_icono_decorativo(tipo: str):
     buffer = io.BytesIO()
     img.save(buffer, format="PNG")
     return buffer.getvalue()
+
+
+@lru_cache(maxsize=1)
+def obtener_logo_creative_commons():
+    if CC_LOGO_PATH.exists():
+        try:
+            return CC_LOGO_PATH.read_bytes()
+        except Exception:
+            pass
+    return generar_icono_decorativo('creative_commons')
 
 # Estilos CSS personalizados
 st.markdown("""
@@ -427,13 +457,26 @@ if icono_data_uri:
         f"""
         <div style='display:flex; align-items:center; justify-content:center; gap:0.8rem; margin-bottom:1rem;'>
             <img src="{icono_data_uri}" alt="Profesor" style="width:68px; height:68px; border-radius:50%; object-fit:cover; box-shadow:0 0 12px rgba(0,0,0,0.15);" />
-            <span style='font-size:1.2rem; font-weight:600; color:#2C3E50;'>Profesor Víctor Manuel Marcos Muñoz</span>
+            <span style='font-size:1.2rem; font-weight:600; color:#2C3E50;'>
+                {PROFESOR_NOMBRE} · <a href="mailto:{PROFESOR_EMAIL}" style="color:#0EA5E9; text-decoration:none;">{PROFESOR_EMAIL}</a>
+            </span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 else:
-    st.markdown("### Profesor Víctor Manuel Marcos Muñoz")
+    st.markdown(f"### {PROFESOR_NOMBRE} · {PROFESOR_EMAIL}")
+
+if "visitas_registradas" not in st.session_state:
+    st.session_state["visitas_registradas"] = False
+if "visit_counter" not in st.session_state:
+    st.session_state["visit_counter"] = 0
+if not st.session_state["visitas_registradas"]:
+    st.session_state["visit_counter"] += 1
+    st.session_state["visitas_registradas"] = True
+st.session_state.setdefault("descargas_pdf", 0)
+if st.session_state.pop("registrar_descarga", False):
+    st.session_state["descargas_pdf"] += 1
 
 st.info(
     """
@@ -448,6 +491,10 @@ st.info(
     ¡Recuerda que el objetivo es disfrutar del proceso y progresar de forma segura!
     """
 )
+
+col_visitas, col_descargas = st.columns(2)
+col_visitas.metric("Visitas registradas", st.session_state["visit_counter"])
+col_descargas.metric("Descargas de PDF", st.session_state["descargas_pdf"])
 
 # Definición de ejercicios por categoría
 EJERCICIOS = {
@@ -545,6 +592,24 @@ EJERCICIOS = {
         "Carrera 1 km",
     ],
 }
+
+CARRERA_WODS_PERMITIDOS = {"AMRAP", "EMOM", "AFAP"}
+EMOM_CARRERA_OPCIONES = {"Shuttle Run", "Carrera 100 m", "Carrera 200 m", "Carrera 400 m"}
+
+
+def obtener_categorias_por_tipo(tipo_circuito: str):
+    categorias = []
+    for categoria, ejercicios in EJERCICIOS.items():
+        lista = ejercicios
+        if categoria == "Carrera":
+            if tipo_circuito not in CARRERA_WODS_PERMITIDOS:
+                continue
+            if tipo_circuito == "EMOM":
+                lista = [ej for ej in ejercicios if ej in EMOM_CARRERA_OPCIONES]
+                if not lista:
+                    continue
+        categorias.append((categoria, lista))
+    return categorias
 # Información de tipos de circuito
 TIPOS_CIRCUITO = {
     "AMRAP": {
@@ -613,38 +678,31 @@ OBJETIVOS_ORDEN = ["Fuerza Máxima", "Hipertrofia", "Fuerza-Resistencia"]
 MIN_EJERCICIOS_CIRCUITO = 6
 MAX_EJERCICIOS_CIRCUITO = 12
 CIRCUITO_ENTRENAMIENTO_KEY = "Circuito de Entrenamiento"
-EMOM_RECUPERACION_TEXTO = (
-    "Completa cada bloque en 40-45 s y usa el resto del minuto (15-20 s) para recuperar y preparar la siguiente serie."
-)
+EMOM_RECUPERACION_TEXTO = "El tiempo sobrante al terminar las repeticiones indicadas en cada ejercicio"
 
 BORG_ESCALA = [
     {
         "nivel": "Muy ligero",
-        "icono": "borg_very_light",
         "color": "#DCFCE7",
         "descripcion": "Respiración tranquila; sirve como calentamiento o descarga.",
     },
     {
         "nivel": "Ligero",
-        "icono": "borg_light",
         "color": "#BBF7D0",
         "descripcion": "Puedes mantener una conversación corta; sensación cómoda.",
     },
     {
         "nivel": "Moderado",
-        "icono": "borg_moderate",
         "color": "#FDE68A",
         "descripcion": "Empiezas a sudar; concentración total en la técnica.",
     },
     {
         "nivel": "Duro",
-        "icono": "borg_hard",
         "color": "#FECACA",
         "descripcion": "Respiración intensa; requiere pausas planificadas.",
     },
     {
         "nivel": "Muy duro",
-        "icono": "borg_very_hard",
         "color": "#FCA5A5",
         "descripcion": "Esfuerzo máximo sostenible sólo durante poco tiempo.",
     },
@@ -717,7 +775,7 @@ EJERCICIOS_INFO = {
     "Mountain Climbers": ["Core", "Hombros", "Cardio"],
     "Plank Hold": ["Core", "Hombros", "Lumbar"],
     "Lunges (Zancadas)": ["Cuádriceps", "Glúteos", "Isquiotibiales"],
-    "Jump Squats": ["Cuádriceps", "Glúteos", "Pantorrillas"],
+    "Jump Squats": ["Cuádriceps", "Glúteos", "Sóleo y gemelos"],
     "Pistol Squats": ["Cuádriceps", "Glúteos", "Estabilidad"],
     "Pull-ups (Dominadas)": ["Espalda", "Bíceps", "Core"],
     "Dips": ["Tríceps", "Pectoral", "Hombros"],
@@ -774,16 +832,16 @@ EJERCICIOS_INFO = {
     "Medicine Ball Sit-up": ["Abdomen", "Oblicuos"],
     "Over the Shoulder Toss": ["Espalda", "Glúteos", "Core"],
     "Medicine Ball Burpee": ["Cardio", "Hombros", "Piernas"],
-    "Unders": ["Cardio", "Pantorrillas", "Hombros"],
-    "Under Crossover": ["Cardio", "Pantorrillas", "Hombros"],
-    "Double Under": ["Cardio", "Pantorrillas", "Hombros"],
+    "Unders": ["Cardio", "Sóleo y gemelos", "Hombros"],
+    "Under Crossover": ["Cardio", "Sóleo y gemelos", "Hombros"],
+    "Double Under": ["Cardio", "Sóleo y gemelos", "Hombros"],
     "Shuttle Run": ["Cardio", "Cuádriceps", "Isquiotibiales"],
-    "Carrera 100 m": ["Cardio", "Cuádriceps", "Pantorrillas"],
-    "Carrera 200 m": ["Cardio", "Cuádriceps", "Pantorrillas"],
-    "Carrera 400 m": ["Cardio", "Cuádriceps", "Pantorrillas"],
-    "Carrera 600 m": ["Cardio", "Cuádriceps", "Pantorrillas"],
-    "Carrera 800 m": ["Cardio", "Cuádriceps", "Pantorrillas"],
-    "Carrera 1 km": ["Cardio", "Cuádriceps", "Pantorrillas"],
+    "Carrera 100 m": ["Cardio", "Cuádriceps", "Sóleo y gemelos"],
+    "Carrera 200 m": ["Cardio", "Cuádriceps", "Sóleo y gemelos"],
+    "Carrera 400 m": ["Cardio", "Cuádriceps", "Sóleo y gemelos"],
+    "Carrera 600 m": ["Cardio", "Cuádriceps", "Sóleo y gemelos"],
+    "Carrera 800 m": ["Cardio", "Cuádriceps", "Sóleo y gemelos"],
+    "Carrera 1 km": ["Cardio", "Cuádriceps", "Sóleo y gemelos"],
 }
 def obtener_musculos(ejercicio: str):
     return EJERCICIOS_INFO.get(ejercicio, ["Cuerpo completo"])
@@ -808,7 +866,7 @@ def construir_tabata_plan(ejercicios):
 # Sidebar - Información del alumno
 with st.sidebar:
     st.header("📋 Información del Alumno")
-    nombre = st.text_input("Nombre completo:", placeholder="Ej: Juan Pérez")
+    nombre = st.text_input("Nombre completo:", placeholder="Ej: Sofía González")
     grupo = st.text_input("Grupo:", placeholder="Ej: 3°A")
     
     st.markdown("---")
@@ -919,65 +977,80 @@ tabata_listo = True
 ejercicios_validos = True
 
 # Crear tabs para cada categoría
-tabs = st.tabs(list(EJERCICIOS.keys()))
+categorias_disponibles = obtener_categorias_por_tipo(tipo_circuito)
 
-for idx, (categoria, ejercicios) in enumerate(EJERCICIOS.items()):
-    with tabs[idx]:
-        st.markdown(f"**Ejercicios de {categoria}**")
-        cols = st.columns(2)
-        for i, ejercicio in enumerate(ejercicios):
-            with cols[i % 2]:
-                st.markdown(f"**{ejercicio}**")
-                st.caption(f"Grupos musculares: {', '.join(obtener_musculos(ejercicio))}")
-                seleccionado = st.checkbox(f"Incluir {ejercicio}", key=f"{categoria}_{ejercicio}")
-                if seleccionado:
-                    repeticiones = None
-                    if tipo_circuito not in ["Tabata", "Ladder"]:
-                        if ejercicio == "Shuttle Run":
-                            opciones_base = [4, 6, 10, 12, 14, 16, 20]
-                            opciones = opciones_base
-                            indice_default = min(2, len(opciones) - 1)
-                            if es_circuito_entrenamiento and reps_min is not None and reps_max is not None:
-                                opciones_filtradas = [opt for opt in opciones_base if reps_min <= opt <= reps_max]
-                                if not opciones_filtradas:
-                                    opciones_filtradas = sorted({reps_min, reps_max})
-                                opciones = sorted(opciones_filtradas)
-                                objetivo_reps = valor_intermedio(reps_min, reps_max)
-                                valor_default = min(opciones, key=lambda val: abs(val - objetivo_reps))
-                                indice_default = opciones.index(valor_default)
-                            repeticiones = st.selectbox(
-                                f"Repeticiones para {ejercicio}",
-                                options=opciones,
-                                index=indice_default,
-                                key=f"reps_{categoria}_{ejercicio}",
-                            )
-                        else:
-                            if es_circuito_entrenamiento and reps_min is not None and reps_max is not None:
-                                default_reps = valor_intermedio(reps_min, reps_max)
-                                repeticiones = st.number_input(
+if not categorias_disponibles:
+    st.warning("No hay categorías de ejercicios disponibles para este WOD.")
+else:
+    tabs = st.tabs([categoria for categoria, _ in categorias_disponibles])
+
+    for idx, (categoria, ejercicios) in enumerate(categorias_disponibles):
+        with tabs[idx]:
+            st.markdown(f"**Ejercicios de {categoria}**")
+            cols = st.columns(2)
+            for i, ejercicio in enumerate(ejercicios):
+                with cols[i % 2]:
+                    st.markdown(f"**{ejercicio}**")
+                    st.caption(f"Grupos musculares: {', '.join(obtener_musculos(ejercicio))}")
+                    seleccionado = st.checkbox(f"Incluir {ejercicio}", key=f"{categoria}_{ejercicio}")
+                    if seleccionado:
+                        repeticiones = None
+                        if tipo_circuito not in ["Tabata", "Ladder"]:
+                            if ejercicio == "Shuttle Run":
+                                opciones_base = [4, 6, 10, 12, 14, 16, 20]
+                                opciones = opciones_base
+                                indice_default = min(2, len(opciones) - 1)
+                                if es_circuito_entrenamiento and reps_min is not None and reps_max is not None:
+                                    opciones_filtradas = [opt for opt in opciones_base if reps_min <= opt <= reps_max]
+                                    if not opciones_filtradas:
+                                        opciones_filtradas = sorted({reps_min, reps_max})
+                                    opciones = sorted(opciones_filtradas)
+                                    objetivo_reps = valor_intermedio(reps_min, reps_max)
+                                    valor_default = min(opciones, key=lambda val: abs(val - objetivo_reps))
+                                    indice_default = opciones.index(valor_default)
+                                repeticiones = st.selectbox(
                                     f"Repeticiones para {ejercicio}",
-                                    min_value=reps_min,
-                                    max_value=reps_max,
-                                    value=default_reps,
-                                    step=1,
+                                    options=opciones,
+                                    index=indice_default,
                                     key=f"reps_{categoria}_{ejercicio}",
                                 )
+                            elif ejercicio == "Plank Hold":
+                                segundos = st.number_input(
+                                    f"Tiempo (segundos) para {ejercicio}",
+                                    min_value=10,
+                                    max_value=300,
+                                    value=30,
+                                    step=5,
+                                    key=f"segundos_{categoria}_{ejercicio}",
+                                )
+                                repeticiones = f"{int(segundos)} s"
                             else:
-                                default_reps = 10
-                                repeticiones = st.number_input(
-                                    f"Repeticiones para {ejercicio}",
-                                    min_value=1,
-                                    max_value=500,
-                                    value=default_reps,
-                                    step=1,
-                                    key=f"reps_{categoria}_{ejercicio}",
-                                )
-                    ejercicios_seleccionados.append({
-                        "categoria": categoria,
-                        "nombre": ejercicio,
-                        "musculos": obtener_musculos(ejercicio),
-                        "repeticiones": repeticiones,
-                    })
+                                if es_circuito_entrenamiento and reps_min is not None and reps_max is not None:
+                                    default_reps = valor_intermedio(reps_min, reps_max)
+                                    repeticiones = st.number_input(
+                                        f"Repeticiones para {ejercicio}",
+                                        min_value=reps_min,
+                                        max_value=reps_max,
+                                        value=default_reps,
+                                        step=1,
+                                        key=f"reps_{categoria}_{ejercicio}",
+                                    )
+                                else:
+                                    default_reps = 10
+                                    repeticiones = st.number_input(
+                                        f"Repeticiones para {ejercicio}",
+                                        min_value=1,
+                                        max_value=500,
+                                        value=default_reps,
+                                        step=1,
+                                        key=f"reps_{categoria}_{ejercicio}",
+                                    )
+                        ejercicios_seleccionados.append({
+                            "categoria": categoria,
+                            "nombre": ejercicio,
+                            "musculos": obtener_musculos(ejercicio),
+                            "repeticiones": repeticiones,
+                        })
 
 # Mostrar resumen
 st.markdown('<p class="sub-header">Resumen del Entrenamiento</p>', unsafe_allow_html=True)
@@ -1055,6 +1128,50 @@ if ejercicios_seleccionados:
 else:
     st.warning("No has seleccionado ningún ejercicio. Por favor, selecciona al menos uno.")
 
+# Clase de lienzo para añadir icono Creative Commons al final
+class CreativeCommonsCanvas(canvas.Canvas):
+    def __init__(self, *args, cc_image=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cc_image = cc_image
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        total_pages = len(self._saved_page_states)
+        for idx, state in enumerate(self._saved_page_states, start=1):
+            self.__dict__.update(state)
+            if idx == total_pages:
+                self._draw_cc_logo()
+            canvas.Canvas.showPage(self)
+        canvas.Canvas.save(self)
+
+    def _draw_cc_logo(self):
+        if not self.cc_image:
+            return
+        try:
+            reader = ImageReader(io.BytesIO(self.cc_image))
+        except Exception:
+            return
+        try:
+            img_width, img_height = reader.getSize()
+        except Exception:
+            img_width = img_height = None
+        max_width = 0.95 * inch
+        max_height = 0.55 * inch
+        if img_width and img_height and img_width > 0 and img_height > 0:
+            scale = min(max_width / img_width, max_height / img_height)
+            draw_width = img_width * scale
+            draw_height = img_height * scale
+        else:
+            draw_width = draw_height = max_height
+        x_pos = self._pagesize[0] - draw_width - 22
+        y_pos = 18
+        self.drawImage(reader, x_pos, y_pos, width=draw_width, height=draw_height, mask='auto')
+
+
 # Función para generar PDF
 def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabata=None, objetivo=None, objetivo_info=None):
     buffer = io.BytesIO()
@@ -1099,6 +1216,12 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
         'CellTextBold',
         parent=cell_style,
         fontName=font_bold
+    )
+    center_bold = ParagraphStyle(
+        'CenterBold',
+        parent=cell_bold,
+        alignment=TA_CENTER,
+        fontSize=11,
     )
     tipo_block_style = ParagraphStyle(
         'TipoBlock',
@@ -1196,10 +1319,15 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
     elif ICONO_PROFESOR.exists():
         icon_img = RLImage(str(ICONO_PROFESOR), width=0.85*inch, height=0.85*inch)
 
+    autor_text = Paragraph(
+        f"{PROFESOR_NOMBRE}<br/><font size=9 color='#475569'>{PROFESOR_EMAIL}</font>",
+        cell_bold,
+    )
+
     if icon_img:
         icon_img.hAlign = 'LEFT'
         autor = Table(
-            [[icon_img, Paragraph("Profesor Víctor Manuel Marcos Muñoz", cell_bold)]],
+            [[icon_img, autor_text]],
             colWidths=[1.0*inch, doc.width - 1.0*inch]
         )
         autor.setStyle(TableStyle([
@@ -1211,7 +1339,7 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
         ]))
         story.append(autor)
     else:
-        story.append(Paragraph("Profesor Víctor Manuel Marcos Muñoz", cell_bold))
+        story.append(autor_text)
 
     story.append(Spacer(1, 0.12*inch))
 
@@ -1458,8 +1586,14 @@ def generar_pdf(nombre, grupo, tipo_circuito, ejercicios, parametros, plan_tabat
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     agregar_bloque("Registro del entrenamiento", [registro_table], icono_tipo="settings", color_fondo='#0F172A')
+    story.append(Paragraph("¡Disfruta de tu entrenamiento!", center_bold))
+    story.append(Spacer(1, 0.12*inch))
 
-    doc.build(story)
+    cc_icon_bytes = obtener_logo_creative_commons()
+    doc.build(
+        story,
+        canvasmaker=lambda *args, **kwargs: CreativeCommonsCanvas(*args, cc_image=cc_icon_bytes, **kwargs)
+    )
     buffer.seek(0)
     return buffer
 
@@ -1522,7 +1656,8 @@ if ejercicios_para_descarga and nombre and grupo and tabata_listo and ejercicios
             data=pdf_buffer,
             file_name=f"Entrenamiento_CrossFit_{nombre.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf",
             mime="application/pdf",
-            use_container_width=True
+            use_container_width=True,
+            on_click=lambda: st.session_state.__setitem__("registrar_descarga", True),
         )
         
         st.success("¡Todo listo! Haz clic en el botón para descargar tu entrenamiento personalizado.")

@@ -996,7 +996,13 @@ else:
                     if seleccionado:
                         repeticiones = None
                         if tipo_circuito not in ["Tabata", "Ladder"]:
-                            if ejercicio == "Shuttle Run":
+                            if (
+                                categoria == "Carrera"
+                                and ejercicio != "Shuttle Run"
+                                and tipo_circuito in CARRERA_WODS_PERMITIDOS
+                            ):
+                                repeticiones = None
+                            elif ejercicio == "Shuttle Run":
                                 opciones_base = [4, 6, 10, 12, 14, 16, 20]
                                 opciones = opciones_base
                                 indice_default = min(2, len(opciones) - 1)
